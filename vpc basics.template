@@ -1,0 +1,122 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Network Template",
+  "Parameters" : {
+    "PrivateBackEndSubnetOneAz" : {
+      "Type" : "AWS::EC2::AvailabilityZone::Name",
+      "Description" : "Selecione Az para Backend Subnet"
+    },
+    "PrivateBackEndSubnetTwoAz" : {
+      "Type" : "AWS::EC2::AvailabilityZone::Name",
+      "Description" : "Selecione AZ para Backend Subnet"
+    },
+    "PrivateDBSubnetAz" : {
+      "Type" : "AWS::EC2::AvailabilityZone::Name",
+      "Description" : "Selecione AZ para Subnet do Banco de dados"
+    }
+    
+  },
+  "Mappings" : {
+    "NetworkConfig" : {
+      "VPC" : {
+        "CIDR" : "10.0.0.0/16"
+      }
+    }
+  },
+  "Conditions" : {
+  },
+  "Resources" : {
+    "VPC" : {
+      "Type" : "AWS::EC2::VPC",
+      "Properties" : {
+        "CidrBlock" : {
+          "Fn::FindInMap" : [ "NetworkConfig", "VPC", "CIDR" ]
+        },
+        "Tags": [
+        	{"Key" : "Name", "Value" : {"Fn::Join": ["-",[{"Ref" : "AWS::StackName"},"vpc"]]}}
+        ]
+      }
+    },
+    
+    "SubnetStack": {
+      "DependsOn": ["VPC"],
+	  "Type" : "AWS::CloudFormation::Stack",
+	  "Properties" : {
+	    "Parameters" : { 
+       		"VpcSelected": {"Ref": "VPC"},
+            "PrivateBackEndSubnetOneAz" : 	{"Ref" : "PrivateBackEndSubnetOneAz"},
+            "PrivateBackEndSubnetTwoAz" : 	{"Ref" : "PrivateBackEndSubnetTwoAz"},
+            "PrivateDBSubnetAz" : 			{"Ref" : "PrivateDBSubnetAz"}
+         },
+	    "TemplateURL" : "https://cf-templates-i0pmeqzorz39-sa-east-1.s3.amazonaws.com/subnets.template",
+	    "TimeoutInMinutes" : 10
+  	}
+   },
+    
+    "SecurityGroupStack": {
+      "DependsOn": ["VPC"],
+	  "Type" : "AWS::CloudFormation::Stack",
+	  "Properties" : {
+	    "Parameters" : { 
+       		"VpcSelected": {"Ref": "VPC"}
+         },
+	    "TemplateURL" : "https://cf-templates-i0pmeqzorz39-sa-east-1.s3.amazonaws.com/securitygroups.template",
+	    "TimeoutInMinutes" : 5
+     }
+  	},
+    
+    "InternetGateway" : {
+      "Type" : "AWS::EC2::InternetGateway",
+      "Properties" : {
+        "Tags": [
+        	{"Key" : "Stack", "Value" : {"Ref" : "AWS::StackName"}}
+        ]
+      }
+    },
+    "AttachGateway" : {
+      "DependsOn" : [ "VPC", "InternetGateway" ],
+      "Type" : "AWS::EC2::VPCGatewayAttachment",
+      "Properties" : {
+        "VpcId" : {
+          "Ref" : "VPC"
+        },
+        "InternetGatewayId" : {
+          "Ref" : "InternetGateway"
+        }
+      }
+    },
+  
+    
+    "PublicRouteTable":{
+      "DependsOn": ["VPC"],
+	   "Type" : "AWS::EC2::RouteTable",
+	   "Properties" : {
+	      "VpcId" : {"Ref" : "VPC"},
+	      "Tags" : [
+         	{"Key" : "Name", "Value" : {"Fn::Join": ["-",[{"Ref" : "AWS::StackName"},"public", "rt"]]}} 
+         ]
+	   }
+	},
+ 
+	"PublicSubnetRouteTableAssociation": {
+   	   "DependsOn" : ["PublicRouteTable", "SubnetStack"],
+	   "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+	   "Properties" : {
+	      "RouteTableId" : {"Ref": "PublicRouteTable"},
+	      "SubnetId" : { "Fn::GetAtt" : [ "SubnetStack", "Outputs.PublicSubnetId" ] }
+	   }
+	},
+ 
+ 	"PublicRoute" : {
+      "DependsOn" : ["PublicRouteTable", "InternetGateway", "AttachGateway"],
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PublicRouteTable" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "GatewayId" : { "Ref" : "InternetGateway" }
+      }
+    } 
+  },
+  "Outputs" : {
+  }
+}

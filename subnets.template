@@ -1,0 +1,120 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "subnets Template",
+
+
+  "Parameters" : {
+   "VpcSelected" : {
+      "Type" : "AWS::EC2::VPC::Id",
+      "Description": "Choose your VPC"
+     },
+     "PrivateBackEndSubnetOneAz" : {
+      "Type" : "AWS::EC2::AvailabilityZone::Name",
+      "Description" : "Selecione A1 para Backend Subnet"
+    },
+    "PrivateBackEndSubnetTwoAz" : {
+      "Type" : "AWS::EC2::AvailabilityZone::Name",
+      "Description" : "Selecione AZ para Backend Subnet"
+    },
+    "PrivateDBSubnetAz" : {
+      "Type" : "AWS::EC2::AvailabilityZone::Name",
+      "Description" : "Selecione AZ para Subnet do Banco de dados"
+    }
+  },
+  
+
+  "Mappings" : {
+     "NetworkConfig" : {
+      "PublicSubnet" : {
+        "CIDR" : "10.0.0.0/24"
+      },
+      "PrivateDBSubnet" : {
+        "CIDR" : "10.0.10.0/24"
+      },
+      "PrivateBackEndSubnetOne" : {
+        "CIDR" : "10.0.20.0/24"
+      },
+      "PrivateBackEndSubnetTwo" : {
+        "CIDR" : "10.0.21.0/24"
+      }
+    }
+  },
+
+  "Conditions" : {
+  },
+
+  "Resources" : {
+      "PublicSubnet" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "CidrBlock" : {
+          "Fn::FindInMap" : [ "NetworkConfig", "PublicSubnet", "CIDR" ]
+        },
+        "VpcId" : {
+          "Ref" : "VpcSelected"
+        },
+        "Tags": [
+        	{"Key" : "Name", "Value" : "public-subnet"}
+        ]
+      }
+      
+    },
+    "PrivateBackEndSubnetOne" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "AvailabilityZone" : {
+          "Ref" : "PrivateBackEndSubnetTwoAz"
+        },
+        "CidrBlock" : {
+          "Fn::FindInMap" : [ "NetworkConfig", "PrivateBackEndSubnetOne", "CIDR" ]
+        },
+        "VpcId" : {
+          "Ref" : "VpcSelected"
+        },
+        "Tags": [
+        	{"Key" : "Name", "Value" : {"Fn::Join" : ["-",["backend",{"Ref" : "PrivateBackEndSubnetTwoAz"},"subnet"]] }}
+        ]
+      }
+    },
+    "PrivateBackEndSubnetTwo" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "AvailabilityZone" : {
+          "Ref" : "PrivateBackEndSubnetOneAz"
+        },
+        "CidrBlock" : {
+          "Fn::FindInMap" : [ "NetworkConfig", "PrivateBackEndSubnetTwo", "CIDR" ]
+        },
+        "VpcId" : {
+          "Ref" : "VpcSelected"
+        },
+        "Tags": [
+        	{"Key" : "Name", "Value" : {"Fn::Join" : ["-",["backend",{"Ref" : "PrivateBackEndSubnetOneAz"},"subnet"]] }}
+        ]
+      }
+    },
+    "PrivateDBSubnet" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "AvailabilityZone": {"Ref": "PrivateDBSubnetAz"},
+        "CidrBlock" : {
+          "Fn::FindInMap" : [ "NetworkConfig", "PrivateDBSubnet", "CIDR" ]
+        },
+        "VpcId" : {
+          "Ref" : "VpcSelected"
+        },
+        "Tags": [
+        	{"Key" : "Name", "Value" : {"Fn::Join" : ["-",["db",{"Ref" : "PrivateDBSubnetAz"},"subnet"]] }}
+        ]
+      }
+    }
+  },
+
+  "Outputs" : {
+    "PublicSubnetId" : {
+	    "Description": "The Public Subnet ID",  
+	    "Value" : { "Ref" : "PublicSubnet" }
+  	}
+  }
+}
